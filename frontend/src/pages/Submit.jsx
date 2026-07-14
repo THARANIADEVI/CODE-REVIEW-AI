@@ -1,6 +1,21 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Editor from "@monaco-editor/react";
+import { useTheme } from "../context/ThemeContext.jsx";
 import { uploadFiles, uploadSnippet, uploadGithubRepo } from "../services/api";
+
+const MONACO_LANGUAGE_BY_EXT = {
+  py: "python",
+  js: "javascript",
+  jsx: "javascript",
+  ts: "typescript",
+  tsx: "typescript",
+};
+
+function monacoLanguageFor(filename) {
+  const ext = filename.trim().split(".").pop()?.toLowerCase();
+  return MONACO_LANGUAGE_BY_EXT[ext] || "plaintext";
+}
 
 const TABS = [
   { key: "files", label: "Upload Files" },
@@ -10,6 +25,7 @@ const TABS = [
 
 export default function Submit() {
   const navigate = useNavigate();
+  const { theme } = useTheme();
   const [tab, setTab] = useState("files");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -130,12 +146,16 @@ export default function Submit() {
               value={snippetFilename}
               onChange={(e) => setSnippetFilename(e.target.value)}
             />
-            <textarea
-              className="input font-mono text-sm h-72"
-              placeholder="Paste your code here..."
-              value={snippetCode}
-              onChange={(e) => setSnippetCode(e.target.value)}
-            />
+            <div className="rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600">
+              <Editor
+                height="320px"
+                language={monacoLanguageFor(snippetFilename)}
+                theme={theme === "dark" ? "vs-dark" : "light"}
+                value={snippetCode}
+                onChange={(value) => setSnippetCode(value || "")}
+                options={{ minimap: { enabled: false }, fontSize: 13, automaticLayout: true }}
+              />
+            </div>
             <button className="btn-primary" disabled={busy}>
               {busy ? "Analyzing..." : "Analyze Snippet"}
             </button>

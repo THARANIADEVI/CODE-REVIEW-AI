@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getReview, downloadReport } from "../services/api";
+import { getReview, downloadReport, generateRefactor, getRefactor } from "../services/api";
 import ScoreBadge from "../components/ScoreBadge.jsx";
 import SeverityBadge from "../components/SeverityBadge.jsx";
 import SeverityChart from "../components/SeverityChart.jsx";
@@ -20,6 +20,9 @@ export default function ReviewDetail() {
   const [error, setError] = useState("");
   const [severityFilter, setSeverityFilter] = useState("");
   const [exporting, setExporting] = useState("");
+  const [refactor, setRefactor] = useState(null);
+  const [refactoring, setRefactoring] = useState(false);
+  const [refactorError, setRefactorError] = useState("");
 
   const load = async () => {
     try {
@@ -31,10 +34,44 @@ export default function ReviewDetail() {
     }
   };
 
+  const loadExistingRefactor = async () => {
+    try {
+      const res = await getRefactor(id);
+      setRefactor({ refactored_code: res.data.refactored_code, changes: res.data.changes });
+    } catch {
+      // no refactor generated yet; ignore
+    }
+  };
+
   useEffect(() => {
     load();
+    loadExistingRefactor();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, severityFilter]);
+
+  const handleRefactor = async () => {
+    setRefactoring(true);
+    setRefactorError("");
+    try {
+      const res = await generateRefactor(id);
+      setRefactor({ refactored_code: res.data.refactored_code, changes: res.data.changes });
+    } catch (err) {
+      setRefactorError(err.response?.data?.error || "Failed to generate refactor");
+    } finally {
+      setRefactoring(false);
+    }
+  };
+
+  const handleDownloadRefactor = () => {
+    if (!refactor) return;
+    const blob = new Blob([refactor.refactored_code], { type: "text/plain" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `refactored_review_${id}.txt`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
 
   const handleExport = async (format) => {
     setExporting(format);
@@ -44,7 +81,8 @@ export default function ReviewDetail() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `review_${id}.${format === "markdown" ? "md" : format}`;
+      const ext = format === "markdown" ? "md" : format === "readme" ? "md" : format;
+      a.download = `${format === "readme" ? "README" : "review"}_${id}.${ext}`;
       a.click();
       window.URL.revokeObjectURL(url);
     } catch {
@@ -77,6 +115,9 @@ export default function ReviewDetail() {
           </button>
           <button className="btn-secondary" disabled={exporting === "html"} onClick={() => handleExport("html")}>
             {exporting === "html" ? "Exporting..." : "Export HTML"}
+          </button>
+          <button className="btn-secondary" disabled={exporting === "readme"} onClick={() => handleExport("readme")}>
+            {exporting === "readme" ? "Exporting..." : "Export README"}
           </button>
         </div>
       </div>
@@ -141,6 +182,46 @@ export default function ReviewDetail() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <h2 className="font-semibold">AI Auto-Refactor</h2>
+          <button className="btn-primary" disabled={refactoring} onClick={handleRefactor}>
+            {refactoring ? "Refactoring..." : refactor ? "Regenerate Refactor" : "Generate AI Refactor"}
+          </button>
+        </div>
+        {refactorError && <p className="text-red-600 text-sm mb-3">{refactorError}</p>}
+        {!refactor && !refactorError && (
+          <p className="text-sm text-gray-500">
+            Have the AI rewrite this file's source code based on the findings above.
+          </p>
+        )}
+        {refactor && (
+          <div className="space-y-4">
+            {refactor.changes?.length > 0 && (
+              <div>
+                <p className="text-xs uppercase text-gray-400 font-semibold mb-1">Changes Made</p>
+                <ul className="text-sm list-disc list-inside space-y-0.5">
+                  {refactor.changes.map((change, idx) => (
+                    <li key={idx}>{change}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs uppercase text-gray-400 font-semibold">Refactored Code</p>
+                <button className="btn-secondary" onClick={handleDownloadRefactor}>
+                  Download
+                </button>
+              </div>
+              <pre className="bg-gray-900 text-gray-100 text-xs font-mono p-4 rounded-lg overflow-x-auto max-h-[32rem] overflow-y-auto">
+                <code>{refactor.refactored_code}</code>
+              </pre>
+            </div>
+          </div>
+        )}
       </div>
 
       {docFiles.length > 0 && (

@@ -18,17 +18,23 @@ def create_app(config_class=Config):
     db.init_app(app)
     jwt.init_app(app)
     bcrypt.init_app(app)
-    cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
+    origins = app.config["CORS_ORIGINS"]
+    allowed_origins = [o.strip() for o in origins.split(",")] if origins != "*" else "*"
+    cors.init_app(app, resources={r"/api/*": {"origins": allowed_origins}})
 
     from routes.auth import auth_bp
     from routes.upload import upload_bp
     from routes.review import review_bp
     from routes.report import report_bp
+    from routes.oauth import oauth_bp
+    from routes.workspace import workspace_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(upload_bp, url_prefix="/api/upload")
     app.register_blueprint(review_bp, url_prefix="/api/reviews")
     app.register_blueprint(report_bp, url_prefix="/api/reports")
+    app.register_blueprint(oauth_bp, url_prefix="/api/oauth")
+    app.register_blueprint(workspace_bp, url_prefix="/api/workspaces")
 
     @app.get("/api/health")
     def health():

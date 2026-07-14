@@ -6,6 +6,7 @@ from extensions import db
 from models import Review, Project, ReviewFinding
 from utils.decorators import current_user_required
 from services.report_service import build_markdown, build_html, build_pdf
+from services.documentation_service import generate_readme_summary
 
 report_bp = Blueprint("report", __name__)
 
@@ -46,6 +47,21 @@ def export_html(user, review_id):
     return Response(
         content, mimetype="text/html",
         headers={"Content-Disposition": f"attachment; filename=review_{review_id}.html"},
+    )
+
+
+@report_bp.get("/<int:review_id>/readme")
+@jwt_required()
+@current_user_required
+def export_readme(user, review_id):
+    review = _get_owned_review(user, review_id)
+    if not review:
+        return jsonify({"error": "Review not found"}), 404
+    files_docs = review.documentation.get("files", [])
+    content = generate_readme_summary(review.project.project_name, files_docs)
+    return Response(
+        content, mimetype="text/markdown",
+        headers={"Content-Disposition": f"attachment; filename=README_{review_id}.md"},
     )
 
 

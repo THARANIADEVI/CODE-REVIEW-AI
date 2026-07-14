@@ -20,7 +20,7 @@ def build_markdown(review, findings) -> str:
         "## Complexity Metrics",
     ]
     for key, value in review.metrics.items():
-        if key == "complexity_blocks":
+        if key in ("complexity_blocks", "files"):
             continue
         lines.append(f"- **{key.replace('_', ' ').title()}:** {value}")
 
@@ -46,7 +46,7 @@ def build_html(review, findings) -> str:
     )
     metrics_rows = "".join(
         f"<tr><td>{k.replace('_', ' ').title()}</td><td>{v}</td></tr>"
-        for k, v in review.metrics.items() if k != "complexity_blocks"
+        for k, v in review.metrics.items() if k not in ("complexity_blocks", "files")
     )
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8">
@@ -95,7 +95,7 @@ def build_pdf(review, findings) -> bytes:
 
     metrics_data = [["Metric", "Value"]] + [
         [k.replace("_", " ").title(), str(v)]
-        for k, v in review.metrics.items() if k != "complexity_blocks"
+        for k, v in review.metrics.items() if k not in ("complexity_blocks", "files")
     ]
     story.append(_table(metrics_data))
     story.append(Spacer(1, 12))

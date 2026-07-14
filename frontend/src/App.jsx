@@ -7,6 +7,11 @@ import Dashboard from "./pages/Dashboard.jsx";
 import Submit from "./pages/Submit.jsx";
 import ReviewDetail from "./pages/ReviewDetail.jsx";
 import Profile from "./pages/Profile.jsx";
+import Analytics from "./pages/Analytics.jsx";
+import Compare from "./pages/Compare.jsx";
+import OAuthCallback from "./pages/OAuthCallback.jsx";
+import Workspaces from "./pages/Workspaces.jsx";
+import WorkspaceDetail from "./pages/WorkspaceDetail.jsx";
 
 export default function App() {
   return (
@@ -17,6 +22,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/oauth/callback" element={<OAuthCallback />} />
           <Route
             path="/dashboard"
             element={
@@ -46,6 +52,38 @@ export default function App() {
             element={
               <PrivateRoute>
                 <Profile />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/analytics"
+            element={
+              <PrivateRoute>
+                <Analytics />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/compare"
+            element={
+              <PrivateRoute>
+                <Compare />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/workspaces"
+            element={
+              <PrivateRoute>
+                <Workspaces />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/workspaces/:id"
+            element={
+              <PrivateRoute>
+                <WorkspaceDetail />
               </PrivateRoute>
             }
           />

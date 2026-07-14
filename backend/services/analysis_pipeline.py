@@ -7,6 +7,7 @@ from models import Review, ReviewFinding
 from services.pylint_service import run_pylint
 from services.bandit_service import run_bandit
 from services.radon_service import run_radon
+from services.eslint_service import run_eslint
 from services.openai_service import review_code_with_ai
 from services.documentation_service import generate_documentation
 from utils.file_utils import detect_language
@@ -16,6 +17,7 @@ SEVERITY_MAP = {
     "refactor": "low", "convention": "info",
 }
 BANDIT_SEVERITY_MAP = {"high": "high", "medium": "medium", "low": "low"}
+ESLINT_SEVERITY_MAP = {"error": "high", "warning": "medium"}
 
 
 def analyze_files(project, files: list) -> Review:
@@ -34,6 +36,9 @@ def analyze_files(project, files: list) -> Review:
         pylint_result = run_pylint(content, filename) if language == "python" else {}
         bandit_result = run_bandit(content, filename) if language == "python" else {}
         radon_result = run_radon(content, filename) if language == "python" else {}
+        eslint_result = (
+            run_eslint(content, filename) if language in ("javascript", "typescript") else {}
+        )
         ai_result = review_code_with_ai(content, filename)
         doc_result = generate_documentation(content, filename)
 
@@ -49,6 +54,18 @@ def analyze_files(project, files: list) -> Review:
                 file_name=filename,
                 line_number=m["line"],
                 source="pylint",
+            ))
+
+        for m in eslint_result.get("messages", []):
+            all_findings.append(ReviewFinding(
+                severity=ESLINT_SEVERITY_MAP.get(m["severity"], "medium"),
+                category="code_quality",
+                issue=f"{m['rule'] or 'eslint'}: {m['message']}"[:295],
+                explanation=m["message"],
+                suggestion="Follow the ESLint rule recommendation for this check.",
+                file_name=filename,
+                line_number=m["line"],
+                source="eslint",
             ))
 
         for issue in bandit_result.get("issues", []):
@@ -85,6 +102,8 @@ def analyze_files(project, files: list) -> Review:
             file_metrics.update(radon_result)
         if pylint_result.get("score") is not None:
             file_metrics["pylint_score"] = pylint_result["score"]
+        if eslint_result.get("score") is not None:
+            file_metrics["eslint_score"] = eslint_result["score"]
         per_file_metrics.append(file_metrics)
 
     aggregated_metrics = _aggregate_metrics(per_file_metrics)
@@ -99,6 +118,7 @@ def analyze_files(project, files: list) -> Review:
     )
     review.metrics = aggregated_metrics
     review.documentation = documentation
+    review.source_files = [{"filename": f["filename"], "content": f["content"]} for f in files]
     db.session.add(review)
     db.session.flush()  # get review.id
 

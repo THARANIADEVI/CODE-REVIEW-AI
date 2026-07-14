@@ -24,3 +24,20 @@ class Config:
 
     OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
     OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+
+    # Comma-separated list of allowed origins for the deployed frontend
+    # (e.g. "https://your-app.vercel.app"). Defaults to "*" for local dev.
+    CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "*")
+
+    SMTP_HOST = os.environ.get("SMTP_HOST", "")
+    SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+    SMTP_USER = os.environ.get("SMTP_USER", "")
+    SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+    SMTP_FROM = os.environ.get("SMTP_FROM", "")
+    FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+
+    GITHUB_CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID", "")
+    GITHUB_CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", "")
+    GITHUB_OAUTH_REDIRECT_URI = os.environ.get(
+        "GITHUB_OAUTH_REDIRECT_URI", "http://localhost:5000/api/oauth/github/callback"
+    )

@@ -1,15 +1,28 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { listReviews, deleteReview } from "../services/api";
 import ScoreBadge from "../components/ScoreBadge.jsx";
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [uploadType, setUploadType] = useState("");
   const [sort, setSort] = useState("newest");
+  const [selected, setSelected] = useState([]);
+
+  const toggleSelected = (id) => {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : prev.length < 2 ? [...prev, id] : prev
+    );
+  };
+
+  const goCompare = () => {
+    if (selected.length !== 2) return;
+    navigate(`/compare?a=${selected[0]}&b=${selected[1]}`);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -51,9 +64,19 @@ export default function Dashboard() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Review Dashboard</h1>
-        <Link to="/submit" className="btn-primary">
-          + New Review
-        </Link>
+        <div className="flex items-center gap-3">
+          {selected.length > 0 && (
+            <span className="text-sm text-gray-500">
+              {selected.length}/2 selected for comparison
+            </span>
+          )}
+          <button className="btn-secondary" disabled={selected.length !== 2} onClick={goCompare}>
+            Compare Selected
+          </button>
+          <Link to="/submit" className="btn-primary">
+            + New Review
+          </Link>
+        </div>
       </div>
 
       <form onSubmit={handleSearch} className="flex flex-wrap gap-3 mb-6">
@@ -86,12 +109,22 @@ export default function Dashboard() {
         <div className="grid gap-4">
           {reviews.map((r) => (
             <div key={r.id} className="card p-4 flex items-center justify-between">
-              <div>
-                <Link to={`/reviews/${r.id}`} className="font-semibold text-brand-600 hover:underline">
-                  {r.project_name}
-                </Link>
-                <p className="text-xs text-gray-500 mt-1">{new Date(r.created_at).toLocaleString()}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 line-clamp-2 max-w-xl">{r.summary}</p>
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  className="mt-1.5"
+                  checked={selected.includes(r.id)}
+                  disabled={!selected.includes(r.id) && selected.length >= 2}
+                  onChange={() => toggleSelected(r.id)}
+                  title="Select for comparison"
+                />
+                <div>
+                  <Link to={`/reviews/${r.id}`} className="font-semibold text-brand-600 hover:underline">
+                    {r.project_name}
+                  </Link>
+                  <p className="text-xs text-gray-500 mt-1">{new Date(r.created_at).toLocaleString()}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 line-clamp-2 max-w-xl">{r.summary}</p>
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 <ScoreBadge score={r.review_score} />

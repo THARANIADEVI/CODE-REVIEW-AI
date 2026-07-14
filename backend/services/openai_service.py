@@ -164,6 +164,121 @@ def _heuristic_review(code: str, filename: str) -> dict:
     return {"quality_score": quality_score, "summary": summary, "findings": findings}
 
 
+# --------------------------------------------------------------------------
+# AI-powered auto-refactor
+# --------------------------------------------------------------------------
+REFACTOR_SYSTEM_PROMPT = "You are an experienced Senior Software Engineer specializing in refactoring."
+
+REFACTOR_USER_PROMPT_TEMPLATE = """Rewrite the following source file to fix the issues listed below while
+preserving its external behavior. Apply best practices, clean up code smells, and address the findings
+where reasonably possible. Do not change the overall purpose of the code.
+
+Return the response in structured JSON format with this exact schema:
+{{
+  "refactored_code": "<the full refactored source code, as a single string>",
+  "changes": ["<short description of change 1>", "<short description of change 2>", "..."]
+}}
+
+File: {filename}
+
+Findings to address:
+{findings_text}
+
+Original code:
+```
+{code}
+```
+"""
+
+
+def generate_refactored_code(source_code: str, findings: list, filename: str = "") -> dict:
+    api_key = current_app.config.get("OPENAI_API_KEY")
+    if api_key:
+        try:
+            return _refactor_with_openai(source_code, findings, filename, api_key)
+        except Exception as exc:  # pragma: no cover - network/library failure fallback
+            fallback = _heuristic_refactor(source_code, findings, filename)
+            fallback["changes"].insert(0, f"AI provider error, used local heuristic refactor. ({exc})")
+            return fallback
+    return _heuristic_refactor(source_code, findings, filename)
+
+
+def _refactor_with_openai(source_code: str, findings: list, filename: str, api_key: str) -> dict:
+    from openai import OpenAI
+
+    client = OpenAI(api_key=api_key)
+    model = current_app.config.get("OPENAI_MODEL", "gpt-4o-mini")
+
+    findings_text = "\n".join(
+        f"- [{f.get('severity', 'medium')}] {f.get('issue', '')}: {f.get('explanation', '')}"
+        for f in (findings or [])
+    ) or "None reported."
+
+    response = client.chat.completions.create(
+        model=model,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": REFACTOR_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": REFACTOR_USER_PROMPT_TEMPLATE.format(
+                    filename=filename, findings_text=findings_text, code=source_code[:20000]
+                ),
+            },
+        ],
+        temperature=0.2,
+    )
+    content = response.choices[0].message.content
+    return _normalize_refactor(json.loads(content), source_code)
+
+
+def _normalize_refactor(data: dict, original_code: str) -> dict:
+    data.setdefault("refactored_code", original_code)
+    data.setdefault("changes", [])
+    if not isinstance(data.get("changes"), list):
+        data["changes"] = [str(data["changes"])]
+    return data
+
+
+# --------------------------------------------------------------------------
+# Offline heuristic refactor fallback (no API key required)
+# --------------------------------------------------------------------------
+def _heuristic_refactor(source_code: str, findings: list, filename: str) -> dict:
+    """Applies a few safe, deterministic transforms using the same heuristics
+    defined above. Never invents behavior changes: if nothing safe to change
+    is found, returns the original code unchanged with an explanatory note."""
+    refactored = source_code
+    changes = []
+
+    # 1. print(...) -> logging.info(...) (only when logging isn't already used oddly)
+    if re.search(r"print\(", refactored):
+        new_refactored = re.sub(r"\bprint\(", "logging.info(", refactored)
+        if new_refactored != refactored:
+            if not re.search(r"^import logging\b", refactored, re.M):
+                new_refactored = "import logging\n" + new_refactored
+            refactored = new_refactored
+            changes.append("Replaced print() calls with logging.info() calls.")
+
+    # 2. bare `except:` -> `except Exception:`
+    new_refactored = re.sub(r"\bexcept\s*:\s*$", "except Exception:", refactored, flags=re.M)
+    if new_refactored != refactored:
+        refactored = new_refactored
+        changes.append("Replaced bare `except:` clauses with `except Exception:`.")
+
+    # 3. Strip trailing whitespace on each line (safe cosmetic cleanup)
+    new_refactored = "\n".join(line.rstrip() for line in refactored.splitlines())
+    if source_code.splitlines() and new_refactored != "\n".join(source_code.splitlines()):
+        if refactored != new_refactored:
+            changes.append("Removed trailing whitespace.")
+        refactored = new_refactored + ("\n" if source_code.endswith("\n") else "")
+
+    if not changes:
+        changes.append("AI refactor requires OPENAI_API_KEY")
+        refactored = source_code
+
+    return {"refactored_code": refactored, "changes": changes}
+
+
 def _find_long_functions(lines, threshold=40):
     findings = []
     current_start = None
