@@ -4,24 +4,51 @@
 
 body {
   @apply text-gray-900 dark:text-gray-100;
+  background: linear-gradient(135deg, #ede9fe 0%, #f0fdf4 45%, #ddd6fe 100%);
+  min-height: 100vh;
+}
+
+.dark body {
+  background: linear-gradient(135deg, #2e1065 0%, #1e293b 45%, #14532d 100%);
+}
+
+/* Glassmorphism base: translucent, blurred, soft purple-tinted border/shadow */
+.glass {
+  @apply backdrop-blur-md border border-white/40 dark:border-white/10 shadow-glass;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.dark .glass {
+  background: rgba(30, 27, 46, 0.45);
 }
 
 .card {
-  @apply bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700;
+  @apply glass rounded-xl;
 }
 
 .btn-primary {
-  @apply bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  @apply backdrop-blur-md text-white px-4 py-2 rounded-lg font-medium transition-all
+    border border-white/30 shadow-glass hover:scale-[1.02] active:scale-[0.98]
+    disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.9), rgba(76, 175, 80, 0.85));
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, rgba(109, 40, 217, 0.95), rgba(67, 160, 71, 0.9));
 }
 
 .btn-secondary {
-  @apply bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 px-4 py-2 rounded-lg font-medium transition-colors;
+  @apply glass text-gray-800 dark:text-gray-100 px-4 py-2 rounded-lg font-medium transition-all hover:scale-[1.02] active:scale-[0.98];
+}
+
+.btn-secondary:hover {
+  background: rgba(76, 175, 80, 0.18);
 }
 
 .input {
-  @apply w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500;
+  @apply w-full glass rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-0;
 }
 
 .badge {
-  @apply text-xs font-semibold px-2 py-1 rounded-full inline-block;
+  @apply text-xs font-semibold px-2 py-1 rounded-full inline-block backdrop-blur-sm;
 }

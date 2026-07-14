@@ -1,6 +1,6 @@
-"""AI-powered code review. Uses OpenAI's Chat Completions API when OPENAI_API_KEY
-is configured; otherwise falls back to a local heuristic reviewer so the app is
-fully usable without any external API key (per "OpenAI API or Any LLM Provider").
+"""AI-powered code review. Uses Mistral AI's Chat Completions API when
+MISTRAL_API_KEY is configured; otherwise falls back to a local heuristic
+reviewer so the app is fully usable without any external API key.
 """
 import json
 import re
@@ -46,11 +46,26 @@ Code:
 """
 
 
+def _mistral_client():
+    """Returns (client, model) if MISTRAL_API_KEY is configured, else (None, None).
+    Mistral AI's API is OpenAI Chat Completions-compatible, so the `openai` SDK
+    is reused here pointed at Mistral's base URL instead of adding a new dependency."""
+    api_key = current_app.config.get("MISTRAL_API_KEY")
+    if not api_key:
+        return None, None
+
+    from openai import OpenAI
+
+    client = OpenAI(api_key=api_key, base_url=current_app.config.get("MISTRAL_BASE_URL", "https://api.mistral.ai/v1"))
+    model = current_app.config.get("MISTRAL_MODEL", "mistral-small-latest")
+    return client, model
+
+
 def review_code_with_ai(code: str, filename: str) -> dict:
-    api_key = current_app.config.get("OPENAI_API_KEY")
-    if api_key:
+    client, model = _mistral_client()
+    if client:
         try:
-            return _review_with_openai(code, filename, api_key)
+            return _review_with_mistral(code, filename, client, model)
         except Exception as exc:  # pragma: no cover - network/library failure fallback
             fallback = _heuristic_review(code, filename)
             fallback["summary"] = f"AI provider error, used local heuristic review. ({exc})"
@@ -58,12 +73,7 @@ def review_code_with_ai(code: str, filename: str) -> dict:
     return _heuristic_review(code, filename)
 
 
-def _review_with_openai(code: str, filename: str, api_key: str) -> dict:
-    from openai import OpenAI
-
-    client = OpenAI(api_key=api_key)
-    model = current_app.config.get("OPENAI_MODEL", "gpt-4o-mini")
-
+def _review_with_mistral(code: str, filename: str, client, model: str) -> dict:
     response = client.chat.completions.create(
         model=model,
         response_format={"type": "json_object"},
@@ -158,7 +168,7 @@ def _heuristic_review(code: str, filename: str) -> dict:
 
     summary = (
         f"Heuristic offline review of {filename}: found {len(findings)} potential issue(s). "
-        "Configure OPENAI_API_KEY for deeper LLM-powered analysis."
+        "Configure MISTRAL_API_KEY for deeper LLM-powered analysis."
     )
 
     return {"quality_score": quality_score, "summary": summary, "findings": findings}
@@ -192,10 +202,10 @@ Original code:
 
 
 def generate_refactored_code(source_code: str, findings: list, filename: str = "") -> dict:
-    api_key = current_app.config.get("OPENAI_API_KEY")
-    if api_key:
+    client, model = _mistral_client()
+    if client:
         try:
-            return _refactor_with_openai(source_code, findings, filename, api_key)
+            return _refactor_with_mistral(source_code, findings, filename, client, model)
         except Exception as exc:  # pragma: no cover - network/library failure fallback
             fallback = _heuristic_refactor(source_code, findings, filename)
             fallback["changes"].insert(0, f"AI provider error, used local heuristic refactor. ({exc})")
@@ -203,12 +213,7 @@ def generate_refactored_code(source_code: str, findings: list, filename: str = "
     return _heuristic_refactor(source_code, findings, filename)
 
 
-def _refactor_with_openai(source_code: str, findings: list, filename: str, api_key: str) -> dict:
-    from openai import OpenAI
-
-    client = OpenAI(api_key=api_key)
-    model = current_app.config.get("OPENAI_MODEL", "gpt-4o-mini")
-
+def _refactor_with_mistral(source_code: str, findings: list, filename: str, client, model: str) -> dict:
     findings_text = "\n".join(
         f"- [{f.get('severity', 'medium')}] {f.get('issue', '')}: {f.get('explanation', '')}"
         for f in (findings or [])
@@ -273,7 +278,7 @@ def _heuristic_refactor(source_code: str, findings: list, filename: str) -> dict
         refactored = new_refactored + ("\n" if source_code.endswith("\n") else "")
 
     if not changes:
-        changes.append("AI refactor requires OPENAI_API_KEY")
+        changes.append("AI refactor requires MISTRAL_API_KEY")
         refactored = source_code
 
     return {"refactored_code": refactored, "changes": changes}

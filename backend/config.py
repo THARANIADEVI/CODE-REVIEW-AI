@@ -22,8 +22,11 @@ class Config:
 
     ALLOWED_EXTENSIONS = {"py", "js", "jsx", "ts", "tsx"}
 
-    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-    OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+    # LLM provider for AI code review + auto-refactor: Mistral AI's native API.
+    # Falls back to a local heuristic reviewer if MISTRAL_API_KEY isn't set.
+    MISTRAL_API_KEY = os.environ.get("MISTRAL_API_KEY", "")
+    MISTRAL_BASE_URL = os.environ.get("MISTRAL_BASE_URL", "https://api.mistral.ai/v1")
+    MISTRAL_MODEL = os.environ.get("MISTRAL_MODEL", "mistral-small-latest")
 
     # Comma-separated list of allowed origins for the deployed frontend
     # (e.g. "https://your-app.vercel.app"). Defaults to "*" for local dev.

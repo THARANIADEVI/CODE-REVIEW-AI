@@ -19,7 +19,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+    <nav className="glass sticky top-0 z-10 rounded-none border-x-0 border-t-0">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         <Link to="/" className="font-bold text-lg text-brand-600">
           AI Code Review Assistant

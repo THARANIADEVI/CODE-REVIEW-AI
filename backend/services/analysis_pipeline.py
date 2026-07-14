@@ -8,7 +8,7 @@ from services.pylint_service import run_pylint
 from services.bandit_service import run_bandit
 from services.radon_service import run_radon
 from services.eslint_service import run_eslint
-from services.openai_service import review_code_with_ai
+from services.mistral_service import review_code_with_ai
 from services.documentation_service import generate_documentation
 from utils.file_utils import detect_language
 

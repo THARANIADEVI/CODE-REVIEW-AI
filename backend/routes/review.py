@@ -3,7 +3,7 @@ from flask_jwt_extended import jwt_required
 from extensions import db
 from models import Review, Project, ReviewFinding
 from utils.decorators import current_user_required
-from services.openai_service import generate_refactored_code
+from services.mistral_service import generate_refactored_code
 
 review_bp = Blueprint("review", __name__)
 
