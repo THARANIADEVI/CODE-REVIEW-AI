@@ -14,10 +14,12 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false
-      - key: OPENAI_API_KEY
+      - key: MISTRAL_API_KEY
         sync: false
-      - key: OPENAI_MODEL
-        value: gpt-4o-mini
+      - key: MISTRAL_BASE_URL
+        value: https://api.mistral.ai/v1
+      - key: MISTRAL_MODEL
+        value: mistral-small-latest
       - key: CORS_ORIGINS
         sync: false
       - key: FRONTEND_URL
