@@ -38,9 +38,3 @@ class Config:
     SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
     SMTP_FROM = os.environ.get("SMTP_FROM", "")
     FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
-
-    GITHUB_CLIENT_ID = os.environ.get("GITHUB_CLIENT_ID", "")
-    GITHUB_CLIENT_SECRET = os.environ.get("GITHUB_CLIENT_SECRET", "")
-    GITHUB_OAUTH_REDIRECT_URI = os.environ.get(
-        "GITHUB_OAUTH_REDIRECT_URI", "http://localhost:5000/api/oauth/github/callback"
-    )

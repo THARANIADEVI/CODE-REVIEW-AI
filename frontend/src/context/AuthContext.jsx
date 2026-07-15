@@ -43,13 +43,6 @@ export function AuthProvider({ children }) {
     setUser(res.data.user);
   };
 
-  const loginWithToken = async (token) => {
-    localStorage.setItem("token", token);
-    const res = await getProfile();
-    localStorage.setItem("user", JSON.stringify(res.data.user));
-    setUser(res.data.user);
-  };
-
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -63,7 +56,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, register, logout, updateUser, loginWithToken }}
+      value={{ user, loading, login, register, logout, updateUser }}
     >
       {children}
     </AuthContext.Provider>
