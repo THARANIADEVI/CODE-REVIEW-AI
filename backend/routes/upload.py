@@ -6,7 +6,6 @@ from utils.decorators import current_user_required
 from utils.file_utils import is_allowed_file, is_ignored_path
 from services.analysis_pipeline import analyze_files
 from services.github_service import fetch_repo_files, GitHubFetchError
-from services.email_service import send_review_notification
 
 upload_bp = Blueprint("upload", __name__)
 
@@ -43,7 +42,6 @@ def upload_files(user):
     db.session.commit()
 
     review = analyze_files(project, files_payload)
-    send_review_notification(user, project, review)
     return jsonify({
         "project": project.to_dict(),
         "review": review.to_dict(include_findings=True),
@@ -73,7 +71,6 @@ def upload_snippet(user):
     db.session.commit()
 
     review = analyze_files(project, [{"filename": filename, "content": code}])
-    send_review_notification(user, project, review)
     return jsonify({
         "project": project.to_dict(),
         "review": review.to_dict(include_findings=True),
@@ -101,7 +98,6 @@ def upload_github(user):
     db.session.commit()
 
     review = analyze_files(project, files_payload)
-    send_review_notification(user, project, review)
     return jsonify({
         "project": project.to_dict(),
         "review": review.to_dict(include_findings=True),

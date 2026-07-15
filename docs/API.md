@@ -186,7 +186,7 @@ Upload one or more source files (`multipart/form-data`) for AI code review. File
 by `is_ignored_path` (skips `node_modules`, `venv`, `.venv`, `__pycache__`, `.git`, `dist`,
 `build`, and binary-ish extensions) and `is_allowed_file` (only `py`, `js`, `jsx`, `ts`, `tsx`
 are analyzed). Up to 25 files (`MAX_FILES`) are processed per request. Creates a `Project` and
-runs the analysis pipeline synchronously, then emails a review notification to the user.
+runs the analysis pipeline synchronously.
 
 **Auth:** Bearer JWT required
 

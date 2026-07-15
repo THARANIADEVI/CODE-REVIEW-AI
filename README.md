@@ -71,10 +71,6 @@ workspaces.
 - Light/dark theme toggle with persistence to `localStorage` and respect for the OS
   `prefers-color-scheme` on first load (`frontend/src/context/ThemeContext.jsx`).
 
-Optional email notifications (`backend/services/email_service.py`) send a plain-text email via
-SMTP after each review completes, when `SMTP_HOST` is configured. This is a no-op (returns
-`False`, never raises) if SMTP isn't configured, so it never blocks the review response.
-
 ## Tech stack
 
 **Backend**: Flask 3, Flask-SQLAlchemy, Flask-JWT-Extended, Flask-Bcrypt, Flask-Cors,
@@ -115,7 +111,6 @@ backend/
     documentation_service.py  AST-based doc generation
     report_service.py         Markdown/HTML/PDF report builders
     github_service.py         Public GitHub repo file fetcher
-    email_service.py          Optional SMTP review notifications
     analysis_pipeline.py      Orchestrates all of the above into one Review
   utils/
     decorators.py, file_utils.py
@@ -155,8 +150,6 @@ Notes on configuration (see `backend/.env.example` for the full list with commen
 - `MISTRAL_API_KEY` is **optional**. Without it, AI code review and auto-refactor run on the
   built-in offline heuristic engine instead of calling Mistral AI. Get a key at
   https://console.mistral.ai/api-keys. `MISTRAL_MODEL` defaults to `mistral-small-latest`.
-- `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASSWORD`/`SMTP_FROM` are optional; leaving
-  `SMTP_HOST` empty disables the "email me when my review is ready" notification with no error.
 - `CORS_ORIGINS` defaults to `*` for local dev; set it to your deployed frontend's origin(s)
   (comma-separated) in production.
 - The JS/TS static-analysis stage (ESLint) requires Node.js and `npx` to be available on the
