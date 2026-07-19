@@ -2,7 +2,7 @@
 
 A full-stack web app that reviews source code (Python and JavaScript/TypeScript) using a
 combination of static analysis tools (Pylint, Bandit, Radon, ESLint) and an AI review pass
-powered by Mistral AI. Users register/log in (or sign in with GitHub), submit code as file
+powered by Mistral AI. Users register/log in, submit code as file
 uploads, pasted snippets, or a public GitHub repository URL, and get back a scored review with
 findings, complexity metrics, auto-generated documentation, and an optional AI-driven
 auto-refactor. Reviews can be browsed on a dashboard, compared side by side, tracked over time
@@ -12,7 +12,8 @@ workspaces.
 ## Features
 
 **Auth**
-- Email/password registration and login (JWT access tokens), logout, password reset, and
+- Email/password registration and login (JWT access tokens), logout, in-session password change
+  (requires current password; not an email-based "forgot password" flow), and
   profile view/update (`backend/routes/auth.py`).
 
 **Code Submission**
@@ -183,10 +184,31 @@ docker-compose up --build
 - **frontend**: built from `frontend/Dockerfile` (multi-stage Vite build served by Nginx),
   exposed on `5173` (mapped to container port 80).
 
-The backend service's environment block in `docker-compose.yml` currently still references
-`OPENAI_API_KEY`/`OPENAI_MODEL` from an earlier iteration of the project; the application code
-itself reads `MISTRAL_API_KEY`/`MISTRAL_BASE_URL`/`MISTRAL_MODEL` (see `backend/config.py`), so
-set those instead when running via Docker Compose.
+Set `MISTRAL_API_KEY` (and optionally `MISTRAL_BASE_URL`/`MISTRAL_MODEL`) in your shell or a
+`.env` file before running `docker-compose up` to enable real AI review inside the containers;
+otherwise the backend falls back to the offline heuristic reviewer, same as running it directly.
+
+## Deployment
+
+**Backend (Render)** — `render.yaml` at the repo root configures this automatically:
+1. On [render.com](https://render.com), New → Blueprint → connect this GitHub repo. Render reads
+   `render.yaml` and creates a web service named `ai-code-review-assistant-api` with the build/start
+   commands already set.
+2. In the service's Environment tab, set the `sync: false` variables Render won't fill in for you:
+   `DATABASE_URL` (Postgres connection string — see Supabase note below, or use Render's own
+   free Postgres add-on), `MISTRAL_API_KEY`, `CORS_ORIGINS` (your Vercel frontend URL once step 2
+   below is done), `FRONTEND_URL`. `SECRET_KEY`/`JWT_SECRET_KEY` are auto-generated.
+3. Deploy, then confirm `https://<your-service-name>.onrender.com/api/health` returns `200 OK`.
+
+**Frontend (Vercel)**:
+1. On [vercel.com](https://vercel.com), New Project → import this repo, root directory `frontend`
+   (framework preset: Vite).
+2. Set `VITE_API_BASE_URL` to `https://<your-render-service>.onrender.com/api`.
+3. Deploy, then set the resulting Vercel URL as `CORS_ORIGINS`/`FRONTEND_URL` back on the Render
+   backend (step 2 above) so the two services can talk to each other, and redeploy the backend.
+
+Free-tier Render web services spin down after ~15 minutes idle and take 30-60s to wake on the
+next request — expect a slow first load if the service has been idle.
 
 ## API endpoints
 
@@ -247,11 +269,8 @@ Six SQLAlchemy models (`backend/models/`), backed by SQLite by default or Postgr
   (owner/admin/member), joined_at. Unique constraint on (workspace_id, user_id).
 
 `supabase_schema.sql` provides a hand-written equivalent schema for provisioning a Supabase
-Postgres database as an alternative to `db.create_all()`; note it currently only covers the
-original `users`/`projects`/`reviews`/`review_findings` tables (no workspace tables), so if you
-provision via that script you'll want to add the workspace tables manually, or just let the
-app's own `db.create_all()` (SQLAlchemy) create the full current schema against your
-`DATABASE_URL` instead.
+Postgres database as an alternative to `db.create_all()`; it covers all six tables (including
+`workspaces`/`workspace_members`) and is kept in sync with `backend/models/*.py`.
 
 ## Notes
 

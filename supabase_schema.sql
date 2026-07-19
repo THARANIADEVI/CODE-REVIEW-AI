@@ -6,18 +6,24 @@
 --
 -- Mapping against the PDF spec's "Database Design" section:
 --   Users           -> users            (spec: id, name, email, password_hash, created_at — unchanged)
---   Projects        -> projects         (spec: id, user_id, project_name, upload_type, created_at — unchanged)
+--   Projects        -> projects         (spec: id, user_id, project_name, upload_type, created_at
+--                                         + workspace_id added for the Team Workspaces bonus feature)
 --   Reviews         -> reviews          (spec: id, project_id, review_score, summary, created_at
 --                                         + metrics_json, documentation_json added to store the
 --                                           Complexity Analysis metrics and generated Documentation
 --                                           that the spec's Core Features section requires but the
---                                           spec's minimal Reviews table didn't include columns for)
+--                                           spec's minimal Reviews table didn't include columns for,
+--                                         + source_json, refactored_code, refactor_summary added for
+--                                           the AI-powered code refactoring bonus feature)
 --   Review Findings -> review_findings  (spec: id, review_id, severity, issue, explanation,
 --                                         suggestion, file_name, line_number
 --                                         + category (bug/security/code_smell/...) and source
 --                                           (pylint/bandit/radon/eslint/ai) added so findings from
 --                                           different analysis stages can be distinguished, per the
 --                                           spec's "AI Code Review" + "Static Analysis" feature lists)
+--   (not in spec)   -> workspaces,      Team Workspaces bonus feature: a workspace has one owner
+--                      workspace_members and many members with roles; projects can optionally belong
+--                                         to a workspace.
 
 create table if not exists users (
     id             bigserial primary key,
@@ -28,14 +34,35 @@ create table if not exists users (
 );
 create index if not exists ix_users_email on users (email);
 
+create table if not exists workspaces (
+    id             bigserial primary key,
+    name           varchar(200) not null,
+    owner_id       bigint not null references users (id) on delete cascade,
+    created_at     timestamptz not null default now()
+);
+create index if not exists ix_workspaces_owner_id on workspaces (owner_id);
+
+create table if not exists workspace_members (
+    id             bigserial primary key,
+    workspace_id   bigint not null references workspaces (id) on delete cascade,
+    user_id        bigint not null references users (id) on delete cascade,
+    role           varchar(20) not null default 'member',  -- owner | admin | member
+    joined_at      timestamptz not null default now(),
+    constraint uq_workspace_member unique (workspace_id, user_id)
+);
+create index if not exists ix_workspace_members_workspace_id on workspace_members (workspace_id);
+create index if not exists ix_workspace_members_user_id on workspace_members (user_id);
+
 create table if not exists projects (
     id             bigserial primary key,
     user_id        bigint not null references users (id) on delete cascade,
     project_name   varchar(200) not null,
     upload_type    varchar(20) not null,  -- 'file' | 'snippet' | 'github'
+    workspace_id   bigint references workspaces (id) on delete set null,
     created_at     timestamptz not null default now()
 );
 create index if not exists ix_projects_user_id on projects (user_id);
+create index if not exists ix_projects_workspace_id on projects (workspace_id);
 
 create table if not exists reviews (
     id                 bigserial primary key,
@@ -44,6 +71,9 @@ create table if not exists reviews (
     summary            text not null default '',
     metrics_json       text not null default '{}',       -- Complexity Analysis dashboard data
     documentation_json text not null default '{}',       -- Documentation Generator output
+    source_json        text,                              -- original submitted source, for refactor
+    refactored_code     text,                              -- AI auto-refactor: full rewritten source
+    refactor_summary    text,                              -- JSON list of refactor change summaries
     created_at         timestamptz not null default now()
 );
 create index if not exists ix_reviews_project_id on reviews (project_id);
