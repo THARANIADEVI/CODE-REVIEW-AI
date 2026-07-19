@@ -11,8 +11,11 @@ class Config:
 
     # PostgreSQL via DATABASE_URL (e.g. postgresql://user:pass@localhost:5432/aicra)
     # falls back to local SQLite so project runs with zero external setup
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        "DATABASE_URL", f"sqlite:///{os.path.join(basedir, 'app.db')}"
+    # `os.environ.get(key, default)` returns "" when the var is set but empty, so an empty
+    # DATABASE_URL= line in .env would override the default and crash SQLAlchemy. Treat
+    # empty/unset identically so the zero-setup SQLite fallback actually works.
+    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL") or (
+        f"sqlite:///{os.path.join(basedir, 'app.db')}"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     # pool_pre_ping tests each pooled connection with a lightweight query before use and
