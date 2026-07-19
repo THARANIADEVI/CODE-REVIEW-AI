@@ -15,6 +15,15 @@ class Config:
         "DATABASE_URL", f"sqlite:///{os.path.join(basedir, 'app.db')}"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # pool_pre_ping tests each pooled connection with a lightweight query before use and
+    # transparently reconnects if it's dead; without it, a connection Supabase has already
+    # closed/reset on idle gets reused and fails with "SSL error: decryption failed or bad
+    # record mac". pool_recycle proactively retires connections before Supabase's own idle
+    # timeout, so the pool stays fresh instead of relying solely on pre-ping.
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_recycle": 280,
+    }
 
     UPLOAD_FOLDER = os.path.join(basedir, "uploads")
     REPORT_FOLDER = os.path.join(basedir, "reports")
