@@ -9,7 +9,6 @@ bandit==1.9.4
 radon==6.0.1
 reportlab==4.2.2
 markdown==3.6
-openai==1.40.0
 Werkzeug==3.0.4
 gunicorn==23.0.0
 psycopg2-binary==2.9.9

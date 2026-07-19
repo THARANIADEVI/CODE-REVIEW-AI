@@ -1,10 +1,16 @@
-"""AI-powered code review. Uses Mistral AI's Chat Completions API when
-MISTRAL_API_KEY is configured; otherwise falls back to a local heuristic
-reviewer so the app is fully usable without any external API key.
+"""AI-powered code review. Calls Mistral AI's native Chat Completions REST API
+(via `requests`) when MISTRAL_API_KEY is configured; otherwise falls back to a
+local heuristic reviewer so the app is fully usable without any external API key.
+
+Uses requests directly instead of the openai SDK: openai 1.40 passes a `proxies=`
+kwarg the newer httpx rejected, crashing OpenAI() construction on deploy.
 """
 import json
 import re
+import requests
 from flask import current_app
+
+MISTRAL_TIMEOUT = 60
 
 SYSTEM_PROMPT = "You are an experienced Senior Software Engineer."
 
@@ -46,48 +52,50 @@ Code:
 """
 
 
-def _mistral_client():
-    """Returns (client, model) if MISTRAL_API_KEY is configured, else (None, None).
-    Mistral AI's API is OpenAI Chat Completions-compatible, so the `openai` SDK
-    is reused here pointed at Mistral's base URL instead of adding a new dependency."""
+def _mistral_config():
+    """Returns (api_key, base_url, model) if MISTRAL_API_KEY is configured, else Nones."""
     api_key = current_app.config.get("MISTRAL_API_KEY")
     if not api_key:
-        return None, None
-
-    from openai import OpenAI
-
-    client = OpenAI(api_key=api_key, base_url=current_app.config.get("MISTRAL_BASE_URL", "https://api.mistral.ai/v1"))
+        return None, None, None
+    base_url = current_app.config.get("MISTRAL_BASE_URL", "https://api.mistral.ai/v1")
     model = current_app.config.get("MISTRAL_MODEL", "mistral-small-latest")
-    return client, model
+    return api_key, base_url, model
+
+
+def _mistral_chat(messages: list, api_key: str, base_url: str, model: str) -> str:
+    """POST to Mistral's OpenAI-compatible chat completions endpoint, return message content."""
+    resp = requests.post(
+        f"{base_url.rstrip('/')}/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={
+            "model": model,
+            "messages": messages,
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"},
+        },
+        timeout=MISTRAL_TIMEOUT,
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"]
 
 
 def review_code_with_ai(code: str, filename: str) -> dict:
-    client, model = _mistral_client()
-    if client:
-        try:
-            return _review_with_mistral(code, filename, client, model)
-        except Exception as exc:  # pragma: no cover - network/library failure fallback
-            fallback = _heuristic_review(code, filename)
-            fallback["summary"] = f"AI provider error, used local heuristic review. ({exc})"
-            return fallback
+    try:
+        api_key, base_url, model = _mistral_config()
+        if api_key:
+            content = _mistral_chat(
+                [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": USER_PROMPT_TEMPLATE.format(filename=filename, code=code[:20000])},
+                ],
+                api_key, base_url, model,
+            )
+            return _normalize(json.loads(content))
+    except Exception as exc:  # network / API / parse failure -> heuristic fallback, never 500
+        fallback = _heuristic_review(code, filename)
+        fallback["summary"] = f"AI provider error, used local heuristic review. ({exc})"
+        return fallback
     return _heuristic_review(code, filename)
-
-
-def _review_with_mistral(code: str, filename: str, client, model: str) -> dict:
-    response = client.chat.completions.create(
-        model=model,
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": USER_PROMPT_TEMPLATE.format(filename=filename, code=code[:20000]),
-            },
-        ],
-        temperature=0.2,
-    )
-    content = response.choices[0].message.content
-    return _normalize(json.loads(content))
 
 
 def _normalize(data: dict) -> dict:
@@ -202,39 +210,27 @@ Original code:
 
 
 def generate_refactored_code(source_code: str, findings: list, filename: str = "") -> dict:
-    client, model = _mistral_client()
-    if client:
-        try:
-            return _refactor_with_mistral(source_code, findings, filename, client, model)
-        except Exception as exc:  # pragma: no cover - network/library failure fallback
-            fallback = _heuristic_refactor(source_code, findings, filename)
-            fallback["changes"].insert(0, f"AI provider error, used local heuristic refactor. ({exc})")
-            return fallback
+    try:
+        api_key, base_url, model = _mistral_config()
+        if api_key:
+            findings_text = "\n".join(
+                f"- [{f.get('severity', 'medium')}] {f.get('issue', '')}: {f.get('explanation', '')}"
+                for f in (findings or [])
+            ) or "None reported."
+            content = _mistral_chat(
+                [
+                    {"role": "system", "content": REFACTOR_SYSTEM_PROMPT},
+                    {"role": "user", "content": REFACTOR_USER_PROMPT_TEMPLATE.format(
+                        filename=filename, findings_text=findings_text, code=source_code[:20000])},
+                ],
+                api_key, base_url, model,
+            )
+            return _normalize_refactor(json.loads(content), source_code)
+    except Exception as exc:  # network / API / parse failure -> heuristic fallback, never 500
+        fallback = _heuristic_refactor(source_code, findings, filename)
+        fallback["changes"].insert(0, f"AI provider error, used local heuristic refactor. ({exc})")
+        return fallback
     return _heuristic_refactor(source_code, findings, filename)
-
-
-def _refactor_with_mistral(source_code: str, findings: list, filename: str, client, model: str) -> dict:
-    findings_text = "\n".join(
-        f"- [{f.get('severity', 'medium')}] {f.get('issue', '')}: {f.get('explanation', '')}"
-        for f in (findings or [])
-    ) or "None reported."
-
-    response = client.chat.completions.create(
-        model=model,
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": REFACTOR_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": REFACTOR_USER_PROMPT_TEMPLATE.format(
-                    filename=filename, findings_text=findings_text, code=source_code[:20000]
-                ),
-            },
-        ],
-        temperature=0.2,
-    )
-    content = response.choices[0].message.content
-    return _normalize_refactor(json.loads(content), source_code)
 
 
 def _normalize_refactor(data: dict, original_code: str) -> dict:
